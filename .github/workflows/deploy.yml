@@ -2,7 +2,7 @@ name: Deploy to EC2
 
 on:
   push:
-    branches: [ main ]  # or your default branch
+    branches: [ main ]
 
 jobs:
   deploy:
@@ -37,18 +37,18 @@ jobs:
         EC2_HOST: ${{ secrets.EC2_HOST }}
         EC2_USER: ${{ secrets.EC2_USER }}
       run: |
-        # Create a temporary directory for the build
-        ssh $EC2_USER@$EC2_HOST 'mkdir -p ~/next-app/temp'
+        # First, install next globally on the server
+        ssh $EC2_USER@$EC2_HOST 'sudo npm install -g next'
         
-        # Copy the build files
-        scp -r .next package*.json public next.config.mjs $EC2_USER@$EC2_HOST:~/next-app/temp/
+        # Create app directory if it doesn't exist
+        ssh $EC2_USER@$EC2_HOST 'mkdir -p ~/next-app'
         
-        # Deploy and restart
+        # Copy all necessary files including node_modules
+        scp -r .next node_modules package*.json public next.config.mjs $EC2_USER@$EC2_HOST:~/next-app/
+        
+        # Start the application with proper port
         ssh $EC2_USER@$EC2_HOST '
           cd ~/next-app &&
-          rm -rf .next package*.json public next.config.mjs &&
-          mv temp/* . &&
-          rmdir temp &&
-          npm install --production &&
-          pm2 restart next-app || pm2 start npm --name "next-app" -- start
+          pm2 delete next-app || true &&
+          pm2 start npm --name "next-app" -- start -- -p 3000
         '
